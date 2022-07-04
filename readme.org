@@ -1,0 +1,8 @@
+#+title: Learning OpenBSD Httpd & Relayd
+#+author: Jacopo Costantini
+
+Studing OpenBSD Web Stack.
+
+Personal notes for Httpd & Relayd softwares.
+
+Main reference /Httpd & Relayd Mastery - Michael W Lucas/
