@@ -1,16 +1,7 @@
-#+title: Httpd & Relayd Mastery
+#+title: Httpd Essentials
 #+author: Jacopo Costantini
 
-* Httpd Essentials
-
-  Httpd is an *BSD web-server
-
-- Httpd software is in /usr/sbin/httpd
-- Httpd configuration:
-  + /etc/httpd.conf
-  + /var/www
-
-** Privilege Separation
+* Privilege Separation
 
    A web server must perform certain tasks with root-level privileges.
 
@@ -23,94 +14,94 @@
    OpenBSD uses /privilege separation/ to divide tasks that require *root*
    from those that don't.
 
-*** Process:
+** Process:
 
-    1. When you start httpd, you'll get a *single process* running as *root*.
+   1. When you start httpd, you'll get a *single process* running as *root*.
 
-       This process binds to *ports, opens log files, reads private keys,
-       and handle all the other privileged tasks*.
+      This process binds to *ports, opens log files, reads private keys,
+      and handle all the other privileged tasks*.
 
-    2. A *second process* will lose its privileges for everything but handling logs.
+   2. A *second process* will lose its privileges for everything but handling logs.
 
-    3. You also get enterily separate processes that handle *client requests*.
+   3. You also get enterily separate processes that handle *client requests*.
 
-    A httpd in standard configuration runs *5 processes*
+   A httpd in standard configuration runs *5 processes*
 
-        #+begin_src shell
-      ~/Org $ ps -ax | grep http
-      57745 ??  Ipc      0:00.01 httpd: server (httpd)
-      24100 ??  Ipc      0:00.01 httpd: server (httpd)
-      64289 ??  Ipc      0:00.00 httpd: server (httpd)
-      60091 ??  Ipc      0:00.00 httpd: logger (httpd)
-      17673 ??  Ip       0:00.00 /usr/sbin/httpd
-      16452 p2  S+p      0:00.04 /usr/bin/grep http
-    #+end_src
+       #+begin_src shell
+     ~/Org $ ps -ax | grep http
+     57745 ??  Ipc      0:00.01 httpd: server (httpd)
+     24100 ??  Ipc      0:00.01 httpd: server (httpd)
+     64289 ??  Ipc      0:00.00 httpd: server (httpd)
+     60091 ??  Ipc      0:00.00 httpd: logger (httpd)
+     17673 ??  Ip       0:00.00 /usr/sbin/httpd
+     16452 p2  S+p      0:00.04 /usr/bin/grep http
+   #+end_src
 
-    When an *unprivileged process* needs privileged information,
-    it requests it from the parent.
-    The parent determines if the child gets that information or not.
+   When an *unprivileged process* needs privileged information,
+   it requests it from the parent.
+   The parent determines if the child gets that information or not.
 
-    That's no reason for the logger to have private keys,
-    so it can never get that information.
-
-
-** Httpd
-
-   The httpd daemon software httpd normally runs whitout any arguments and is started at boot or rcctl.
-
-*** Validating the configuration (/etc/httpd.conf)
-
-    Validating the configuration file before trying to restart server with
-
-    #+begin_src shell
-      httpd -n
-    #+end_src
-
-    If you are testing an alternative configuration file,
-    specify that file with -f
-
-    #+begin_src shell
-      httpd -nf httpd.conf-test
-    #+end_src
-
-    If the web server is doing things you don't expcet, you might want to run httpd in *debug mode*. this means that *httpd* won't detach from the terminal, but instead print details on what it's doing.
-
-    #+begin_src shell
-      httpd -d
-    #+end_src
-
-    Add one or more -v to increase verbosity.
-    Hit C-c to terminate *debug-mode httpd*
+   That's no reason for the logger to have private keys,
+   so it can never get that information.
 
 
-    You can manage httpd through OpenBSD's *rcctl* mechanism, running commands like
-    #+begin_src shell
-      rcctl restart httpd
-      #and
-      rcctl reload httpd
-    #+end_src
+* Httpd
 
-    - A *restart* clears everything from system memory
-    - A *reload* tells the parent process to send the configuration and private keys to he unprivileged process.
+  The httpd daemon software httpd normally runs whitout any arguments and is started at boot or rcctl.
 
-** /etc/httpd.conf
+** Validating the configuration (/etc/httpd.conf)
 
-    The httpd configuration file resambles other OpenBSD daemons, with a keyword and value syntax.
-    Curly braces mark subsections, such as settings for individual virtual hosts.
+   Validating the configuration file before trying to restart server with
 
-    OpenBSD doesn't install a configuration file, but you can find a
-    detailed sample configuration in //etc/examples/httpd.conf/
+   #+begin_src shell
+     httpd -n
+   #+end_src
 
-    #+begin_src conf
-      server "macpapo.dev" {
-      listen on localhost port 80
-      root "/"
-      }
-    #+end_src
+   If you are testing an alternative configuration file,
+   specify that file with -f
 
-    This configuration defines a *server name*, attaches the *httpd daemon* to an *IP address and port*, and *points the server to a document root directory*
+   #+begin_src shell
+     httpd -nf httpd.conf-test
+   #+end_src
 
-** The Httpd Chroot
+   If the web server is doing things you don't expcet, you might want to run httpd in *debug mode*. this means that *httpd* won't detach from the terminal, but instead print details on what it's doing.
+
+   #+begin_src shell
+     httpd -d
+   #+end_src
+
+   Add one or more -v to increase verbosity.
+   Hit C-c to terminate *debug-mode httpd*
+
+
+   You can manage httpd through OpenBSD's *rcctl* mechanism, running commands like
+   #+begin_src shell
+     rcctl restart httpd
+     #and
+     rcctl reload httpd
+   #+end_src
+
+   - A *restart* clears everything from system memory
+   - A *reload* tells the parent process to send the configuration and private keys to he unprivileged process.
+
+* /etc/httpd.conf
+
+   The httpd configuration file resambles other OpenBSD daemons, with a keyword and value syntax.
+   Curly braces mark subsections, such as settings for individual virtual hosts.
+
+   OpenBSD doesn't install a configuration file, but you can find a
+   detailed sample configuration in //etc/examples/httpd.conf/
+
+   #+begin_src conf
+     server "macpapo.dev" {
+     listen on localhost port 80
+     root "/"
+     }
+   #+end_src
+
+   This configuration defines a *server name*, attaches the *httpd daemon* to an *IP address and port*, and *points the server to a document root directory*
+
+* The Httpd Chroot
 
     All web site files, Unix sockets, device nodes, and so on must go in a single directory. Httpd uses *chroot* to *lock itself into that directory*.
     A running server cannot access any files outside that directory.
@@ -164,7 +155,7 @@
 
     Use the *chroot* option in *httpd.conf* to specify a new base directory for httpd.
 
-** Httpd Configuration
+* Httpd Configuration
 
     All httpd configuration happens in //etc/httpd.conf/. You can add additional files, but you must specify those in /httpd.conf/.
 
@@ -177,7 +168,7 @@
     You can also update most configuration settings with *SIGHUP*.
     Vital functions include per-server configuration, media types, global settings and macros.
 
-*** Macros
+** Macros
 
     A macro is a way to replace repeated information with a variable.
     Macros must go at the top of /httpd.conf/, before any other configuration statements. If you need to refer to an IP address many times, replace that IP with a macro
@@ -195,46 +186,46 @@ public_ip="127.0.0.1"
       }
     #+end_src
 
-*** Overriding Macros
+** Overriding Macros
 
-     You might want to override a macro on the command line for /testing/.
-     This is poor practice in production, but invaluable in testing and debugging. Use the *-D* flag to httpd, followed by the new macro definition.
+    You might want to override a macro on the command line for /testing/.
+    This is poor practice in production, but invaluable in testing and debugging. Use the *-D* flag to httpd, followed by the new macro definition.
 
-     #+begin_src shell
-       httpd -dvv -D public_ip=127.0.0.1
-     #+end_src
-
-*** Virtual Servers
-
-    Httpd supports multiple web sites on one instance of httpd.
-    Each site is called /virtual server/.
-    The server keyword marks the configuration for a single virtual server in /httpd.conf/.
-
-    You can add virtual servers until the traffic load slows your server unacceptably.
-
-    Multiple servers can have the same name but different *TCP ports or IP addresses.*
-
-*** Global versus Server Options
-
-    Of httpd's many options, some apply to the running httpd instance as a whole, others apply only within a single virtual server.
-
-    #+begin_src conf
-      public_ip="127.0.0.1"
-
-        server "macpapo.dev" {
-        listen on $public_ip port 80
-        root "/"
-        }
+    #+begin_src shell
+      httpd -dvv -D public_ip=127.0.0.1
     #+end_src
 
-    The macro /public_ip/ is a global option. Once set it can be referred to anywhere in /httpd.conf/.
+** Virtual Servers
 
-    The /"server"/ keyword indicates the start of a *virtual server*.
-    Any options within the curly braces apply only to that server.
+   Httpd supports multiple web sites on one instance of httpd.
+   Each site is called /virtual server/.
+   The server keyword marks the configuration for a single virtual server in /httpd.conf/.
 
-    In httpd *TCP/IP addresses and ports* a *per-server option*.
+   You can add virtual servers until the traffic load slows your server unacceptably.
 
-*** Include Files
+   Multiple servers can have the same name but different *TCP ports or IP addresses.*
+
+** Global versus Server Options
+
+   Of httpd's many options, some apply to the running httpd instance as a whole, others apply only within a single virtual server.
+
+   #+begin_src conf
+     public_ip="127.0.0.1"
+
+       server "macpapo.dev" {
+       listen on $public_ip port 80
+       root "/"
+       }
+   #+end_src
+
+   The macro /public_ip/ is a global option. Once set it can be referred to anywhere in /httpd.conf/.
+
+   The /"server"/ keyword indicates the start of a *virtual server*.
+   Any options within the curly braces apply only to that server.
+
+   In httpd *TCP/IP addresses and ports* a *per-server option*.
+
+** Include Files
 
     Configuration files that include more than a few virtual servers quickly become cumbersome. It's often convenient to split virtual server configurations into separate configuration files.
 
@@ -274,240 +265,240 @@ public_ip="127.0.0.1"
 
     One included file for *TLC-sites* and a separate one for *non-TLS sites* best balance.
 
-** Virtual Server Configuration
+* Virtual Server Configuration
 
-*** Document Directory
+** Document Directory
 
-    Use the /root/ option to tell httpd where to find the documents that make up the site.
-    The site's root directory is relative to the chroot.
+   Use the /root/ option to tell httpd where to find the documents that make up the site.
+   The site's root directory is relative to the chroot.
 
-    #+begin_src conf
-      server "www.macpapo.io" {
-      listen on $public_ip port www
-       listen on $public_ip6 port 80
-      root "/test"
-      }
-    #+end_src
+   #+begin_src conf
+     server "www.macpapo.io" {
+     listen on $public_ip port www
+      listen on $public_ip6 port 80
+     root "/test"
+     }
+   #+end_src
 
-    The HTML documents, PHP scripts, or whatever that make up the site content sould go in the /test/ directory in the httpd chroot, or //var/www/test.
+   The HTML documents, PHP scripts, or whatever that make up the site content sould go in the /test/ directory in the httpd chroot, or //var/www/test.
 
-    Any virtual server without a document root set uses the /htdocs/ directory.
+   Any virtual server without a document root set uses the /htdocs/ directory.
 
-*** Networking
+** Networking
 
-    Connect each virtual server to the network with the /listen/ statement.
-    A listen statement must define both a network address and a /TCP port/.
+   Connect each virtual server to the network with the /listen/ statement.
+   A listen statement must define both a network address and a /TCP port/.
 
-    Httpd supports both /IPv4/ and /IPv6/ addresses, but they must by specified separately.
+   Httpd supports both /IPv4/ and /IPv6/ addresses, but they must by specified separately.
 
-    The easiest way to configure httpd is to listen on all of the host's IP addresses, on the standard /HTTP port 80/.
-    Use *** to indicate all /IPv4 addresses/, and *::* for all /IPv6 addresses/.
-    The *port* keyword gives the /TCP/IP port/.
+   The easiest way to configure httpd is to listen on all of the host's IP addresses, on the standard /HTTP port 80/.
+   Use *** to indicate all /IPv4 addresses/, and *::* for all /IPv6 addresses/.
+   The *port* keyword gives the /TCP/IP port/.
 
-    Common TCP/IP port for unencrypted web sites is 80.
+   Common TCP/IP port for unencrypted web sites is 80.
 
-    #+begin_src conf
-      server "macpapo.dev" {
-      listen on * port 80
-      listen on :: port 80
-      root "/ww1"
-      }
-    #+end_src
+   #+begin_src conf
+     server "macpapo.dev" {
+     listen on * port 80
+     listen on :: port 80
+     root "/ww1"
+     }
+   #+end_src
 
-    To make a virtual server to listen only on a particular IP, rather than all IP addresses, specify the address.
+   To make a virtual server to listen only on a particular IP, rather than all IP addresses, specify the address.
 
-    #+begin_src conf
-      listen on 192.0.2.101 port 80
-      listen on 2001::db8::101
-    #+end_src
+   #+begin_src conf
+     listen on 192.0.2.101 port 80
+     listen on 2001::db8::101
+   #+end_src
 
-    Httpd can also use interface name and groups.
-    When give an interface name or group name, httpd attaches the primary /IPv4 address/ of that interface.
+   Httpd can also use interface name and groups.
+   When give an interface name or group name, httpd attaches the primary /IPv4 address/ of that interface.
 
-    #+begin_src conf
-    listen on em0 port 80
-    #+end_src
+   #+begin_src conf
+   listen on em0 port 80
+   #+end_src
 
-    Ports can be specified as numbers, or as names from //etc/services/. Mixing port names and numbers increases the odds your fellow sysadmins will track you down and smack you.
+   Ports can be specified as numbers, or as names from //etc/services/. Mixing port names and numbers increases the odds your fellow sysadmins will track you down and smack you.
 
-*** Aliases
+** Aliases
 
-    Web sites often have more than one name.
-    For most sites, the leading "www" is optional. While the server option gives the site's official name, any additional names can be given with the /alias/ keyword.
+   Web sites often have more than one name.
+   For most sites, the leading "www" is optional. While the server option gives the site's official name, any additional names can be given with the /alias/ keyword.
 
-    #+begin_src conf
-      server "www.macpapo.io" {
-       alias "macpapo.io"
-       alias "ww.macpapo.io"
-       alias "wwww.macpapo.io"
-      listen on $public_ip port www
-      listen on $public_ip port 90
-      root "/www1"
-      }
-    #+end_src
+   #+begin_src conf
+     server "www.macpapo.io" {
+      alias "macpapo.io"
+      alias "ww.macpapo.io"
+      alias "wwww.macpapo.io"
+     listen on $public_ip port www
+     listen on $public_ip port 90
+     root "/www1"
+     }
+   #+end_src
 
-    Any client requesting one of the alias names will see the www.macpapo.io web site, provided the necessary DNS entries exist.
+   Any client requesting one of the alias names will see the www.macpapo.io web site, provided the necessary DNS entries exist.
 
-*** Indexes
+** Indexes
 
-    When a client hits a web site, the server looks for an index document to serve as the front page. The traditional index file is index.html.
-    Some people and application uses other extensions, some for technical reasons and some for preference. Use the /directory index/ option to tell the server the name of the site's index file.
+   When a client hits a web site, the server looks for an index document to serve as the front page. The traditional index file is index.html.
+   Some people and application uses other extensions, some for technical reasons and some for preference. Use the /directory index/ option to tell the server the name of the site's index file.
 
-    #+begin_src conf
-    directory index index.erb
-    #+end_src
+   #+begin_src conf
+   directory index index.erb
+   #+end_src
 
-    Some sites have no index document, however.
-    Httpd doesn't create indexes unless you turn them on.
-    Use the /directory auto-index/ feature to enable automatic index creation.
+   Some sites have no index document, however.
+   Httpd doesn't create indexes unless you turn them on.
+   Use the /directory auto-index/ feature to enable automatic index creation.
 
-        #+begin_src conf
-          server "www.macpapo.io" {
-            listen on $public_ip port www
-            listen on $public_ip port 90
-            root "/site10"
-            directory index index.htm
-            directory auto index
-          }
-    #+end_src
-
-    The site generate index for the user, and defaults to using an index file of index.htm
-
-*** Combining Configurations
-
-    Take a look at the configuration in the previous section. We use the /directory/ keyword twice. Those two entries can be combined in a single line through the use of curly braces.
-
-    #+begin_src conf
-    directory {auto index, index index.htm}
-    #+end_src
-
-*** Locations
-
-    We often need to set special rules for parts of a web site.
-    A /location/ statement allow you to change options depending on the request path -- the stuff after the site name.
-
-    In a link like /http://www.mallard.info/awesome.htm/, the loaction is //awesome.htm/.
-
-    You can use locations to assemble web sites out of disparate directories in the chroot.
-
-    The standard //var/www/ has a separate directory for *CGI* scripts, //var/www/cgi-bin/, but that directory isn't inside any web site directories.
-    You could use symlinks to attach the /cgi-bin/ directory to a web site, or use a location directive in //httpd.conf/ to accomplish the same thing.
-
-    #+begin_src conf
-      server "www.mallard.info" {
-       listen on $public_ip port 80
-       root "/htdocs/bgplg"
-
-       location "/cgi-bin/*" {
-         root "/"
-        }
-      }
-    #+end_src
-
-    The main web site content is in the directory //var/www/htdocs/bgplg/.
-    The location statement define the request path //cgi-bin/, indicating that the following configuration applies when someone browses to /http://www.mallard.info/cgi-bin//. That directory has its own root statement, redefining the root directory as */*, or the httpd chroot's directory. This attaches the directory //var/www/cgi-bin/ to the web site, even though the web site's root directory is //var/www/htdocs/bgplg/.
-
-    Directory locations that end in a slash (*/*) apply to the directory and all its contents. If you're talking about files in the directory but not the directory itself you'll need to use a file name, a glob, or a pattern.
-
-*** Per-Location Rules
-
-    With per-location settings you can. say, password-protect a particular directory, or turn off logging on a particular type of file.
-
-    #+begin_src conf
-       server "www.mallard.info" {
-       ...
-       directory auto index
-         location "/files/*" {
-           directory no auto index
+       #+begin_src conf
+         server "www.macpapo.io" {
+           listen on $public_ip port www
+           listen on $public_ip port 90
+           root "/site10"
+           directory index index.htm
+           directory auto index
          }
-      }
-    #+end_src
+   #+end_src
 
-    The first directory statement enable index auto-generation for the whole site.
-    The location statement turns it off for any request that matchs //files//.
-    A user that visits http://www.mallard.info will see an auto-generated index if needed, but a visitor to the location http://www.mallard.info/files/ gets a 403(*Forbidden*) error. The server lack permission to list the contents of that directory.
+   The site generate index for the user, and defaults to using an index file of index.htm
 
-** MIME Types
+** Combining Configurations
 
-    The *HTTP* protocol uses *Multipurpose Internet Mail Extensions* (/MIME/) types to identify file types. The server uses these /MIME/ types to sent the client hints about how to process the file. That's how a web browser knows that a *HTML* file should be rendered but a *MP3* file shouldn't.
+   Take a look at the configuration in the previous section. We use the /directory/ keyword twice. Those two entries can be combined in a single line through the use of curly braces.
 
-    A /MIME/ type definition contains two parts: a type definition and file extensions.
+   #+begin_src conf
+   directory {auto index, index index.htm}
+   #+end_src
 
-    #+begin_src conf
-    text/html html htm shtml
-    #+end_src
+** Locations
 
-    This example defines the application type //text/html/. It's for *HTML* code.
-    The second part lists three file extensions. When a client requests a file with a name ending in /.html, .htm, or shtml,/ httpd transmits the file with a note that says, "This stuff is of /MIME/ type /text/html/". The browser uses that information to know how to treat the file.
+   We often need to set special rules for parts of a web site.
+   A /location/ statement allow you to change options depending on the request path -- the stuff after the site name.
 
-    Use the /types/ statement to set /MIME/ types in /httpd.conf/.
+   In a link like /http://www.mallard.info/awesome.htm/, the loaction is //awesome.htm/.
 
-    #+begin_src conf
-      types {
-        text/html     html htm shtml
-      }
-    #+end_src
+   You can use locations to assemble web sites out of disparate directories in the chroot.
 
-    OpenBSD includes a list of /MIME/ types in //usr/share/misc/mime.types/.
+   The standard //var/www/ has a separate directory for *CGI* scripts, //var/www/cgi-bin/, but that directory isn't inside any web site directories.
+   You could use symlinks to attach the /cgi-bin/ directory to a web site, or use a location directive in //httpd.conf/ to accomplish the same thing.
 
-    #+begin_src conf
-      types {
-        include /usr/share/misc/mime.types
-      }
-    #+end_src
+   #+begin_src conf
+     server "www.mallard.info" {
+      listen on $public_ip port 80
+      root "/htdocs/bgplg"
 
-    You can define types either with an included text file or explicitly within /httpd.conf/, but not both.
+      location "/cgi-bin/*" {
+        root "/"
+       }
+     }
+   #+end_src
 
-** Authentication
+   The main web site content is in the directory //var/www/htdocs/bgplg/.
+   The location statement define the request path //cgi-bin/, indicating that the following configuration applies when someone browses to /http://www.mallard.info/cgi-bin//. That directory has its own root statement, redefining the root directory as */*, or the httpd chroot's directory. This attaches the directory //var/www/cgi-bin/ to the web site, even though the web site's root directory is //var/www/htdocs/bgplg/.
 
-    Httpd allows authentication via industry standard /htpasswd/ files.
-    Tell httpd to require a password file with the authenticate statement either directly in a server description or in a location statement.
-    You must give a password file within the chroot.
+   Directory locations that end in a slash (*/*) apply to the directory and all its contents. If you're talking about files in the directory but not the directory itself you'll need to use a file name, a glob, or a pattern.
 
-    #+begin_src conf
-      loaction "/files/*" {
-         authenticate with "/htpasswords"
-      }
-    #+end_src
+** Per-Location Rules
 
-    This example authenticates users against the password file //var/www/htpasswords/.
+   With per-location settings you can. say, password-protect a particular directory, or turn off logging on a particular type of file.
 
-    You can define a security realm, letting you define text that should appear in the browser's password box. Not all browsers will display this message, though.
+   #+begin_src conf
+      server "www.mallard.info" {
+      ...
+      directory auto index
+        location "/files/*" {
+          directory no auto index
+        }
+     }
+   #+end_src
 
-    #+begin_src conf
-      loaction "/files/*" {
-         authenticate "Legit Haxors Only" with "/htpasswords"
-      }
-    #+end_src
+   The first directory statement enable index auto-generation for the whole site.
+   The location statement turns it off for any request that matchs //files//.
+   A user that visits http://www.mallard.info will see an auto-generated index if needed, but a visitor to the location http://www.mallard.info/files/ gets a 403(*Forbidden*) error. The server lack permission to list the contents of that directory.
 
-    Once you require authentication, nobody can access the site until they enter a correct username and password.
+* MIME Types
 
-    OpenBSD's htpasswd only support bcrypt, httpd only supports bcrypt passwords.
+   The *HTTP* protocol uses *Multipurpose Internet Mail Extensions* (/MIME/) types to identify file types. The server uses these /MIME/ types to sent the client hints about how to process the file. That's how a web browser knows that a *HTML* file should be rendered but a *MP3* file shouldn't.
 
-    If you're manually maintaining the password file, run /htpasswd/ with the username as an argument. Enter the password when prompted, and htpasswd will spit out the password entry.
+   A /MIME/ type definition contains two parts: a type definition and file extensions.
 
-    #+begin_src shell
-      htpasswd mallard
-      Password:
-      Retype Password:
-      mallard: ...pwd
-    #+end_src
+   #+begin_src conf
+   text/html html htm shtml
+   #+end_src
 
-    To make /htpasswd/ add the entry to the password file for you, give /htpasswd/ the name of the password file and the username as arguments, in that order
+   This example defines the application type //text/html/. It's for *HTML* code.
+   The second part lists three file extensions. When a client requests a file with a name ending in /.html, .htm, or shtml,/ httpd transmits the file with a note that says, "This stuff is of /MIME/ type /text/html/". The browser uses that information to know how to treat the file.
 
-    #+begin_src shell
-      htpasswd /var/www/htpasswd mallard
-    #+end_src
+   Use the /types/ statement to set /MIME/ types in /httpd.conf/.
 
-    You'll get the same password prompt. If the user already exists, /htpasswd/ changes their password. If the user does not exist in the password file, they do now.
+   #+begin_src conf
+     types {
+       text/html     html htm shtml
+     }
+   #+end_src
 
-** Default Server & Settings
+   OpenBSD includes a list of /MIME/ types in //usr/share/misc/mime.types/.
 
-    Httpd uses the default server when nothing else fits.
-    Perhaps the client reached the site by its IP address rather than a web site name. Maybe a server doesn't have a document root directory set.
+   #+begin_src conf
+     types {
+       include /usr/share/misc/mime.types
+     }
+   #+end_src
 
-    If you're running a whole bunch of different servers in a single instance of httpd, you probably want a default server that redirects to you company page or to a general information page.
+   You can define types either with an included text file or explicitly within /httpd.conf/, but not both.
 
-    The first server configured in /httpd.conf/ is considered the default server.
-    Any client that gets to the host without offering a complete modern request gets dumped there.
-    You don't have to configure every settings for every server. Any settings missing for a server falls through to httpd's defaults.
+* Authentication
+
+   Httpd allows authentication via industry standard /htpasswd/ files.
+   Tell httpd to require a password file with the authenticate statement either directly in a server description or in a location statement.
+   You must give a password file within the chroot.
+
+   #+begin_src conf
+     loaction "/files/*" {
+        authenticate with "/htpasswords"
+     }
+   #+end_src
+
+   This example authenticates users against the password file //var/www/htpasswords/.
+
+   You can define a security realm, letting you define text that should appear in the browser's password box. Not all browsers will display this message, though.
+
+   #+begin_src conf
+     loaction "/files/*" {
+        authenticate "Legit Haxors Only" with "/htpasswords"
+     }
+   #+end_src
+
+   Once you require authentication, nobody can access the site until they enter a correct username and password.
+
+   OpenBSD's htpasswd only support bcrypt, httpd only supports bcrypt passwords.
+
+   If you're manually maintaining the password file, run /htpasswd/ with the username as an argument. Enter the password when prompted, and htpasswd will spit out the password entry.
+
+   #+begin_src shell
+     htpasswd mallard
+     Password:
+     Retype Password:
+     mallard: ...pwd
+   #+end_src
+
+   To make /htpasswd/ add the entry to the password file for you, give /htpasswd/ the name of the password file and the username as arguments, in that order
+
+   #+begin_src shell
+     htpasswd /var/www/htpasswd mallard
+   #+end_src
+
+   You'll get the same password prompt. If the user already exists, /htpasswd/ changes their password. If the user does not exist in the password file, they do now.
+
+* Default Server & Settings
+
+   Httpd uses the default server when nothing else fits.
+   Perhaps the client reached the site by its IP address rather than a web site name. Maybe a server doesn't have a document root directory set.
+
+   If you're running a whole bunch of different servers in a single instance of httpd, you probably want a default server that redirects to you company page or to a general information page.
+
+   The first server configured in /httpd.conf/ is considered the default server.
+   Any client that gets to the host without offering a complete modern request gets dumped there.
+   You don't have to configure every settings for every server. Any settings missing for a server falls through to httpd's defaults.

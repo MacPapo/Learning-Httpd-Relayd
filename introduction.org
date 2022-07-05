@@ -1,4 +1,70 @@
 #+title: Introduction to OpenBSD Web Stack
 #+author: Jacopo Costantini
 
+#+begin_quote
+Reducing the complexity helps maximise meme availability
+#+end_quote
 
+The members of the OpenBSD project are masters of reducing complexity
+
+We'll learn how to deploy web sites, balance and manipulate traffic across a server farm, and build redundant servers.
+
+* The OpenBSD Web Stack
+
+  The OpenBSD web application stack has several components:
+
+  - The *Httpd web server*
+  - The *Relayd load balancer*
+  - *CARP*
+
+** The httpd Web Server
+
+   Httpd is an *BSD web-server
+
+   - Httpd software is in /usr/sbin/httpd
+   - Httpd configuration:
+     + /etc/httpd.conf
+     + /var/www
+   Designed to provide the most common web site functions
+
+   No advanced server features!
+
+   The minimal features set extends to the configuration.
+   The most sensible features are not optional, but mandatory.
+
+   EX. The smart way to run a web site is to *restrict it to a subsection of the server's filesystem* (a /chroot/).
+   /Httpd always runs in a chroot!/
+
+   If you want to reduce system security, you must run a less secure web server.
+
+** The PF packet filter
+
+   PF is a general-purpose packet filter that allow you to dictate which traffic a host accepts and rejects based on its /TCP/IP/ characteristics.
+
+   It performs network address translation(/NAT/) and can do traffic shaping.
+
+   PF includes its own load balancing algorithm.
+
+
+** The relayd Load Balancer
+
+   Relayd is a tool for redirecting traffic between servers, letting you divide traffic between multiple hosts.
+
+   You can use relayd to configure load balancing for any /TCP/IP/ protocol.
+
+   Relayd can act as a web proxy, letting you intercept and filter traffic from desktop clients.
+
+   Relayd has features unrelated to the web stack, such as the ability to dynamically load balance multiple Internet Links.
+
+
+** The Common Address Redundancy Protocol
+
+   CARP allows multiple hosts to share a single IP address.
+   If one of the hosts fails, the other can take over providing service.
+
+
+* Load Balancing Goals
+
+  Load balancing can provide redundancy, so that if one host fails another host can offer the site.
+  This kind of balancing lets you perform maintenance on one host at a time.
+  Load balancing might also provide scalability.
