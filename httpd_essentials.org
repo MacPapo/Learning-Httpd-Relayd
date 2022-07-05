@@ -10,9 +10,9 @@
   + /etc/httpd.conf
   + /var/www
 
-** Privilede Separation
+** Privilege Separation
 
-   A web server must performe certain tasks with root-level privileges.
+   A web server must perform certain tasks with root-level privileges.
 
    #+begin_quote
    Only *root* can attach to the common web server ports of 80 and 443.
@@ -20,25 +20,23 @@
    Only *root* can read private key files
 #+end_quote
 
-   OpenBSD uses /privilege separation/ to didive tasks that require *root*
+   OpenBSD uses /privilege separation/ to divide tasks that require *root*
    from those that don't.
 
 *** Process:
-    1. When you start httpd, you'll get a single process running as *root*.
-       -> this process binds to *ports, opens log files, reads private keys, and handle all the other privileged tasks*
 
-    2. A second process will lose its privileges for everything but handling logs
+    1. When you start httpd, you'll get a *single process* running as *root*.
 
-    3. You also get enterily separate process that handle *client request*
+       This process binds to *ports, opens log files, reads private keys,
+       and handle all the other privileged tasks*.
+
+    2. A *second process* will lose its privileges for everything but handling logs.
+
+    3. You also get enterily separate processes that handle *client requests*.
 
     A httpd in standard configuration runs *5 processes*
 
-    When an unprivileged process needs privileged information, it requests it from the parent.
-    The parent determines if the child gets that information or not.
-
-    That's no reason for the logger to have private keys, so it ca never get that information.
-
-    #+begin_src shell
+        #+begin_src shell
       ~/Org $ ps -ax | grep http
       57745 ??  Ipc      0:00.01 httpd: server (httpd)
       24100 ??  Ipc      0:00.01 httpd: server (httpd)
@@ -47,9 +45,18 @@
       17673 ??  Ip       0:00.00 /usr/sbin/httpd
       16452 p2  S+p      0:00.04 /usr/bin/grep http
     #+end_src
+
+    When an *unprivileged process* needs privileged information,
+    it requests it from the parent.
+    The parent determines if the child gets that information or not.
+
+    That's no reason for the logger to have private keys,
+    so it can never get that information.
+
+
 ** Httpd
 
-   The httpd deamon software httpd normally runs whitout any arguments and is started at boot or rcctl.
+   The httpd daemon software httpd normally runs whitout any arguments and is started at boot or rcctl.
 
 *** Validating the configuration (/etc/httpd.conf)
 
@@ -59,7 +66,8 @@
       httpd -n
     #+end_src
 
-    If you are testing an alternative config file, specify that file with -f
+    If you are testing an alternative configuration file,
+    specify that file with -f
 
     #+begin_src shell
       httpd -nf httpd.conf-test
@@ -85,31 +93,32 @@
     - A *restart* clears everything from system memory
     - A *reload* tells the parent process to send the configuration and private keys to he unprivileged process.
 
-*** /etc/httpd.conf
+** /etc/httpd.conf
 
-    The httpd configuration file resambles other OpenBSD deamons, with a keyword and value syntax.
+    The httpd configuration file resambles other OpenBSD daemons, with a keyword and value syntax.
     Curly braces mark subsections, such as settings for individual virtual hosts.
 
-    OpenBSD doesn't install a configuration file, but you can find a detailed sample configuration in //etc/examples/httpd.conf/
+    OpenBSD doesn't install a configuration file, but you can find a
+    detailed sample configuration in //etc/examples/httpd.conf/
 
     #+begin_src conf
-      server "www.macpapo.io" {
-      listen on 192.168.1.86 port 80
+      server "macpapo.dev" {
+      listen on localhost port 80
       root "/"
       }
     #+end_src
 
-    This config defines a *server name*, attaches the *httpd deamon* to an *IP address and port*, and *points the server to a document root directory*
+    This configuration defines a *server name*, attaches the *httpd daemon* to an *IP address and port*, and *points the server to a document root directory*
 
-*** The Httpd Chroot
+** The Httpd Chroot
 
     All web site files, Unix sockets, device nodes, and so on must go in a single directory. Httpd uses *chroot* to *lock itself into that directory*.
     A running server cannot access any files outside that directory.
     The *chroot directory* defaults to //var/www/, the home directory of the *www* user.
 
-    You will find several subdirectories int he *chroot*
+    You will find several subdirectories in the *chroot*
 
-    - *Automatic Certificate Management Enviroment* client
+    - *Automatic Certificate Management Environment* client
 
       It's most commonly used for the *Let's Encrypt certificate authority*.
       The acme-client program stores its *TLS* certificates and working files
@@ -151,11 +160,11 @@
       Httpd uses *FastCGI* to run scripts, such as *CGIs* and *PHP* pages.
       OpenBSD's *FastCGI* implementation, *slowcgi*, accepts request via *Unix sockets*. Those sockets go in //var/www/run/.
 
-    It's possible that operating system upgrades might change the contents of //var/www/. You might want to change the loaction of your chroot, so that you can precisely control what goes on in your site.
+    It's possible that operating system upgrades might change the contents of //var/www/. You might want to change the location of your chroot, so that you can precisely control what goes on in your site.
 
     Use the *chroot* option in *httpd.conf* to specify a new base directory for httpd.
 
-*** Httpd Configuration
+** Httpd Configuration
 
     All httpd configuration happens in //etc/httpd.conf/. You can add additional files, but you must specify those in /httpd.conf/.
 
@@ -174,19 +183,19 @@
     Macros must go at the top of /httpd.conf/, before any other configuration statements. If you need to refer to an IP address many times, replace that IP with a macro
 
     #+begin_src config
-public_ip="192.168.1.68"
+public_ip="127.0.0.1"
     #+end_src
 
     You can use that macro in a configuration. Use a dollar sign($) in front of the macro name to indicate that it's a variable.
 
     #+begin_src conf
-      server "www.macpapo.io" {
+      server "macpapo.dev" {
       listen on $public_ip port 80
       root "/"
       }
     #+end_src
 
-**** Overriding Macros
+*** Overriding Macros
 
      You might want to override a macro on the command line for /testing/.
      This is poor practice in production, but invaluable in testing and debugging. Use the *-D* flag to httpd, followed by the new macro definition.
@@ -201,7 +210,7 @@ public_ip="192.168.1.68"
     Each site is called /virtual server/.
     The server keyword marks the configuration for a single virtual server in /httpd.conf/.
 
-    You can add virtual servers until the raffic load slows your server unacceptably.
+    You can add virtual servers until the traffic load slows your server unacceptably.
 
     Multiple servers can have the same name but different *TCP ports or IP addresses.*
 
@@ -210,9 +219,9 @@ public_ip="192.168.1.68"
     Of httpd's many options, some apply to the running httpd instance as a whole, others apply only within a single virtual server.
 
     #+begin_src conf
-      public_ip="192.168.1.86"
+      public_ip="127.0.0.1"
 
-        server "www.macpapo.io" {
+        server "macpapo.dev" {
         listen on $public_ip port 80
         root "/"
         }
@@ -243,14 +252,14 @@ public_ip="192.168.1.68"
 
     Like: //etc/sites/default.conf/  //etc/sites/openbsd.org.conf/
 
-    Many automantion systems expect exacly this configuration.
+    Many automation systems expect exactly this configuration.
 
     As we discuss virtual servers, we'll assume that each site has its own configuration file in //etc/sites/.
 
     Included files can include other files.
 
     #+begin_src conf
-      server "www.macpapo.io" {
+      server "macpapo.dev" {
        include "/etc/global-httpd.conf"
        ...
       }
@@ -264,6 +273,8 @@ public_ip="192.168.1.68"
     #+end_src
 
     One included file for *TLC-sites* and a separate one for *non-TLS sites* best balance.
+
+** Virtual Server Configuration
 
 *** Document Directory
 
@@ -296,7 +307,7 @@ public_ip="192.168.1.68"
     Common TCP/IP port for unencrypted web sites is 80.
 
     #+begin_src conf
-      server "www.macpapo.io" {
+      server "macpapo.dev" {
       listen on * port 80
       listen on :: port 80
       root "/ww1"
@@ -311,7 +322,7 @@ public_ip="192.168.1.68"
     #+end_src
 
     Httpd can also use interface name and groups.
-    When give an ionterface name or group name, httpd attaches the primary /IPv4 affress/ of that interface.
+    When give an interface name or group name, httpd attaches the primary /IPv4 address/ of that interface.
 
     #+begin_src conf
     listen on em0 port 80
@@ -339,7 +350,7 @@ public_ip="192.168.1.68"
 
 *** Indexes
 
-    When a client hits a web site, the server looks for an index document to serve as teh front page. The traditional index file is index.html.
+    When a client hits a web site, the server looks for an index document to serve as the front page. The traditional index file is index.html.
     Some people and application uses other extensions, some for technical reasons and some for preference. Use the /directory index/ option to tell the server the name of the site's index file.
 
     #+begin_src conf
@@ -360,16 +371,15 @@ public_ip="192.168.1.68"
           }
     #+end_src
 
-    The site generate indexs for the user, and defaluts to using an index file of index.htm
+    The site generate index for the user, and defaults to using an index file of index.htm
 
-*** Combining Configuration
+*** Combining Configurations
 
     Take a look at the configuration in the previous section. We use the /directory/ keyword twice. Those two entries can be combined in a single line through the use of curly braces.
 
     #+begin_src conf
     directory {auto index, index index.htm}
     #+end_src
-
 
 *** Locations
 
@@ -381,7 +391,7 @@ public_ip="192.168.1.68"
     You can use locations to assemble web sites out of disparate directories in the chroot.
 
     The standard //var/www/ has a separate directory for *CGI* scripts, //var/www/cgi-bin/, but that directory isn't inside any web site directories.
-    You could use symlinks to attach the /cgi-bin/ directory to a web site, or use a location diretive in //httpd.conf/ to accomplish the same thing.
+    You could use symlinks to attach the /cgi-bin/ directory to a web site, or use a location directive in //httpd.conf/ to accomplish the same thing.
 
     #+begin_src conf
       server "www.mallard.info" {
@@ -399,7 +409,6 @@ public_ip="192.168.1.68"
 
     Directory locations that end in a slash (*/*) apply to the directory and all its contents. If you're talking about files in the directory but not the directory itself you'll need to use a file name, a glob, or a pattern.
 
-
 *** Per-Location Rules
 
     With per-location settings you can. say, password-protect a particular directory, or turn off logging on a particular type of file.
@@ -408,7 +417,7 @@ public_ip="192.168.1.68"
        server "www.mallard.info" {
        ...
        directory auto index
-         location "/files/" {
+         location "/files/*" {
            directory no auto index
          }
       }
@@ -418,8 +427,7 @@ public_ip="192.168.1.68"
     The location statement turns it off for any request that matchs //files//.
     A user that visits http://www.mallard.info will see an auto-generated index if needed, but a visitor to the location http://www.mallard.info/files/ gets a 403(*Forbidden*) error. The server lack permission to list the contents of that directory.
 
-
-*** MIME Types
+** MIME Types
 
     The *HTTP* protocol uses *Multipurpose Internet Mail Extensions* (/MIME/) types to identify file types. The server uses these /MIME/ types to sent the client hints about how to process the file. That's how a web browser knows that a *HTML* file should be rendered but a *MP3* file shouldn't.
 
@@ -432,7 +440,7 @@ public_ip="192.168.1.68"
     This example defines the application type //text/html/. It's for *HTML* code.
     The second part lists three file extensions. When a client requests a file with a name ending in /.html, .htm, or shtml,/ httpd transmits the file with a note that says, "This stuff is of /MIME/ type /text/html/". The browser uses that information to know how to treat the file.
 
-    Use the /types/ statement to se /MIME/ types in /httpd.conf/.
+    Use the /types/ statement to set /MIME/ types in /httpd.conf/.
 
     #+begin_src conf
       types {
@@ -450,8 +458,7 @@ public_ip="192.168.1.68"
 
     You can define types either with an included text file or explicitly within /httpd.conf/, but not both.
 
-
-*** Authentication
+** Authentication
 
     Httpd allows authentication via industry standard /htpasswd/ files.
     Tell httpd to require a password file with the authenticate statement either directly in a server description or in a location statement.
@@ -465,7 +472,7 @@ public_ip="192.168.1.68"
 
     This example authenticates users against the password file //var/www/htpasswords/.
 
-    You can define a security realm, letting you define text that should appear in the browser's password box. NOt all browsers will display this message, though.
+    You can define a security realm, letting you define text that should appear in the browser's password box. Not all browsers will display this message, though.
 
     #+begin_src conf
       loaction "/files/*" {
@@ -475,7 +482,7 @@ public_ip="192.168.1.68"
 
     Once you require authentication, nobody can access the site until they enter a correct username and password.
 
-    OpenBSD's htpassed only support bcrypt, httpd only supports bcrypt passwords.
+    OpenBSD's htpasswd only support bcrypt, httpd only supports bcrypt passwords.
 
     If you're manually maintaining the password file, run /htpasswd/ with the username as an argument. Enter the password when prompted, and htpasswd will spit out the password entry.
 
@@ -494,8 +501,7 @@ public_ip="192.168.1.68"
 
     You'll get the same password prompt. If the user already exists, /htpasswd/ changes their password. If the user does not exist in the password file, they do now.
 
-
-*** Default Server & Settings
+** Default Server & Settings
 
     Httpd uses the default server when nothing else fits.
     Perhaps the client reached the site by its IP address rather than a web site name. Maybe a server doesn't have a document root directory set.
