@@ -6,3 +6,4 @@ Useful Links for the site navigation
 
 * [[file:introduction.html][Introduction]]
 * [[file:httpd_essentials.html][Httpd Essentials]]
+* [[file:blocks_redirects.html][Httpd Blocks and Redirects]]

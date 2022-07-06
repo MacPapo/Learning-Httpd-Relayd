@@ -1,0 +1,132 @@
+#+title: Httpd Blocks and Redirects
+#+author: Jacopo Costantini
+
+* Blocking Requests
+
+  Use the /block/ statement to refuse clients.
+  Clients that request a blocked site receive HTTP error *403* (/Forbidden/).
+
+  You might use unilateral blocks while performing maintenance on a site.
+
+  #+begin_src conf
+    server "macpapo.dev" {
+       block
+       ...
+    }
+  #+end_src
+
+  You can also use blocks on a location within the site.
+
+  #+begin_src conf
+    ...
+    location "/files/" {
+         block
+    }
+  #+end_src
+
+  If you don't want to return the *403* error, tell httpd to immediately reset the connection with the /block drop/ statement.
+  The server immediately terminates any request to that location, and the user sees their browser's equivalent of the "The connection was reset while the page was loading".
+
+  #+begin_src conf
+    ...
+    location "/files/" {
+         block drop
+    }
+  #+end_src
+
+You might need to override a broader block statement and permit access to a subdirectory.
+Use the /pass/ statement to override an earlier block.
+
+#+begin_src conf
+  server "macpapo.dev" {
+     ...
+     block
+      location "/files/" {
+        pass
+      }
+  }
+#+end_src
+
+Users who browse to the main site will get an error.
+Anyone who discovers the hidden files directory gets access.
+
+Blocks have a place, but are not broadly useful. Blocks become much more useful when you add redirect.
+
+* Redirects
+
+  Httpd uses the /block return/ statement with an HTTP redirect code and the new target to issue these redirects.
+
+  #+begin_src conf
+    server "macpapo.dev" {
+       listen on $public_ip port 80
+       block return 301 "https://github.com/MacPapo"
+    }
+  #+end_src
+
+  When someone hits this site, they receive an HTTP *301* message and the URL /https://github.com/MacPapo/. This tells the browser to go to the next site.
+
+  You can also use redirects on locations.
+
+  #+begin_src conf
+    ...
+    location "/personal/*" {
+         block return 301 "https://github.com/MacPapo"
+    }
+    ...
+  #+end_src
+
+  A browser that requests anything in the site's /personal/ directory gets a *301* redirection code and the new target URL.
+
+** HTTP Redirect Code
+
+   The HTTP protocol sets aside error codes from *300* to *399* for redirection.
+   The most important:
+
+   - *301*:
+     Is the old "permanent redirect" code.
+     The client is allowed to remember that any future requests for this link should go to the new target.
+
+   - *302*:
+     Is used to indicate a "temporary redirect". The browser should proceed to the redirected site, but shouldn't cache that information.
+     The next time the user requests that site, the browser should check the server again.
+
+   - *307*:
+     Is a temporary redirect, much like a *302*.
+
+   - *308*:
+     Is a permanent, cacheable redirect that resemble a *301*
+
+ HTTP codes 301 and 302 allows the client to change the type of request.
+ The client can, switch between HTTP POST and HTTP GET.
+ The *307* and *308* codes were added to specifically disallow this transformation.
+
+** Redirect Macros
+
+   Httpd includes macros that let you dynamically create redirections based on the client request.
+   These are more useful than just redirecting an entire site.
+
+   The macro *$SERVER_NAME* is the name of the server in the client's request. if you browse to http://macpapo.dev, the value of *$SERVER_NAME* is "macpapo.dev".
+
+   The macro *$REQUEST_URI* represents the chunk of the client request after the server name.
+   You can combine these for transparent redirection of non-TLS sites to TLS.
+
+   #+begin_src conf
+     server "www.macpapo.dev" {
+        listen on $public_ip6 port 80
+        block return 301 "https://$SERVER_NAME$REQUEST_URI"
+     }
+   #+end_src
+
+   You'd also need a separate server entry for the TLS version of your site.
+
+   The macro *$DOCUMENT_URI* gives the request path after the path after the server name, including the leading slash, but without any query string, useful for many applications.
+
+   When a client client requests /http://macpapo.dev/bad.php?user=1/, the value of *$QUERY_STRING* is "user=1".
+
+   You might combine *$DOCUMENT_URI* and *$QUERY_STRING* to build redirections after rearranging your site.
+
+   The *$SERVER_ADDR* and *$SERVER_PORT* macros give the httpd server's /IP/ address and /TCP port/.
+
+   Similarly, the *$REMOTE_ADDR* and *$REMOTE_PORT* macros give the client's /IP/ address and the /TCP/ connection's source port.
+
+   The *%n* macro is used with /Lua/ patterns.
