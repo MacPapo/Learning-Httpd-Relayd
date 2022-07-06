@@ -1,1 +1,312 @@
 #+title: Globs and Patterns
+#+author: Jacopo Costantini
+
+* Globs
+
+  A glob is a /shell-style/ pattern matching.
+  You can use globs to have one httpd server respond to multiple names, or names that match certain limited patterns.
+
+  The most important features of globs are wildcards and character classes. Globs support 2 types of wildcards:
+
+  - Single Characters
+  - Zero or more Characters
+
+
+** One-Character Wildcards
+
+   Use the question mark(/?/) when you want to match a single character but you don't care what that character is.
+
+   EX. www1, www2, www3
+
+   #+begin_src conf
+     server "www?.macpapo.dev" {
+        listen on $public_ip6 port 90
+        root "/www1"
+    }
+   #+end_src
+
+   This matches any site with a name starting with /www/ and one extra character.
+   Httpd serves both /www3.macpapo.dev/ and /wwwD.macpapo.dev/ from this definition.
+
+   The catch is, this server doesn't match plain old three-letter /www/, you will need an alias
+
+   #+begin_src conf
+     server "www?.macpapo.dev" {
+       alias "www.macpapo.dev"
+       listen on $public_ip6 port 80
+       root "/www1"
+     }
+   #+end_src
+
+   You can also use wildcards in location statements.
+
+   #+begin_src conf
+     server "www.macpapo.dev" {
+       listen on $public_ip port www
+       root "/www1"
+       directory auto index
+       location "/secret?/" {
+          directory no auto index
+       }
+     }
+   #+end_src
+
+   A user who browses to /http://www.macpapo.dev/secret1/ or /http://www.macpapo.dev/secretX/ gets either a *404* error, the index of that page of that directory, or *403 Forbidden* error, depending on if the directory exists or if it has an index file.
+
+   A user can browse to /http://www.macpapo.dev/secret99/ and get a directory index!!
+   A question mark wildcard only matches one character!
+
+   You need a different wildcard to match multiple characters.
+
+** Multi-Character Wildcards
+
+   To match zero or more arbitrary characters, use the asterisk(***) wildcard.
+
+   #+begin_src conf
+     server "*.macpapo.dev" {
+       listen on $public_ip6 port 80
+       root "/www1"
+     }
+   #+end_src
+
+   When someone points their web browser at /www.macpapo.dev/, /giampy.macpapo.dev/, or any other host name, this server can answer.
+
+   Note that /http://macpapo.dev/ won't answer, you'll need an alias, or you can change the wildcard to get rid of the period.
+
+   #+begin_src conf
+     server "*macpapo.dev" {
+       ...
+     }
+   #+end_src
+
+   This matches plain old /http://macpapo.dev/, but also /http://www.giampymacpapo.dev/.
+
+   Wildcards are very useful when you want to apply an option to a directory and all its sub-directories.
+
+   #+begin_src conf
+    ...
+    location "/files/" {
+        directory no auto index
+     }
+    ...
+   #+end_src
+
+   Any request to the directory //files// on the site doesn't get an automatically generated index.
+
+   The directory //files/subdirectory// doesn't match //files//, so httpd falls back on the global defaults.
+   To make httpd apply an option to a location and all of its subdirectories, add an asterisk.
+
+   #+begin_src conf
+     ...
+     location "/files/*" {
+         directory no auto index
+     }
+     ...
+   #+end_src
+
+   You can use wildcards to apply rules to all locations with a particular string in their name.
+
+   #+begin_src conf
+      ...
+      location "*secret*" {
+        directory no auto index
+      }
+      ...
+   #+end_src
+
+   Httpd refuse to generate an index for any directory that contains the string /secret/ in any directory within the site's directory.
+
+
+** Character Groups and Classes
+
+   You can match a specific character or group of characters.
+   Use square brackets (/[]/) around the characters you're looking for.
+
+   #+begin_src conf
+     server "[ab1][cd2][ef3].macpapo.dev" {
+       ...
+   #+end_src
+
+   Pattern must be:
+   - First character:
+     + a
+     + b
+     + 1
+
+   - Second character:
+     + c
+     + d
+     + 2
+
+   - Third character:
+     + e
+     + f
+     + 3
+
+   Httpd directs queries to /ace.macpapo.dev/ to this server, as well as bdf.macpapo.dev
+
+   *Httpd treats globs as case-insensitive* -> no need to create [aAbBcC] groups.
+
+   You can also ranges of characters.
+   Letters and numbers have an order, and you can use that order in groups.
+
+   A statement like [a-e] means "match any single character A through E".
+   You can combine ranges of characters and digits with statements like [a-e1-5].
+
+   To match anything that's a digit, use the range [0-9].
+   Use [a-z] to match a letter.
+
+   To invert the meaning of a group, use put an exclamation point in front of the range.
+   The group [!a-e] matches anything that's not A, B, C, D or E.
+
+   *HTTPD does not support the shell glob's named character classes*, like /alpha/ and /digit/ and /xdigit/.
+
+   *HTTPD does not support some of the exclusions and special characters, such as using a backslash for explicitly say "match the following special character"*
+
+   EX. secret directory that end with number -> no index
+       secret directory that end with letter -> index
+
+       #+begin_src conf
+         ...
+         location "/secret[a-z]/*" {
+           directory auto index
+         }
+
+         location "/secret[0-9]/*" {
+           directory no auto index
+         }
+         ...
+       #+end_src
+
+       These classes work on a character-by-character basis.
+       You can't match all numbers from 0 to 99 with [0-99];
+       you'd need a more complicated glob for that. Better to use *patterns* for such task.
+
+
+* Patterns
+
+   While OpenBSD does not include Lua, it includes support for Lua's pattern syntax.
+
+   Lua-style patterns let you perform more complicated matching and comparison than globs without having to get into the tangled morass of regular expressions.
+   You  can use patterns in server and location statements.
+
+   *Patterns can look a lot like globs*
+
+   *You'll need to tell httpd that a configuration uses patterns rather than globs with the /match/ keyword*.
+
+   #+begin_src conf
+    server match "w+.macpapo.dev" {
+       ...
+       location match "/w+/" {
+   #+end_src
+
+   Without the /match/ keyword, httpd would treat these as a globs.
+
+   Lua patterns work by combining a series of character classes and wildcards.
+   Character classes are either a single character, a class defined with a leading /%/, or a set like [a-e].
+
+   Wildcards include characters like ***, *+*, *-* and *?*.
+
+   The example server match and location match statements above, *w+*, match a string of one or more Ws. The pattern *%d%d%d%d* matches a string of four digits, while rss%w* matches any alphanumeric string that starts with the character "rss".
+
+
+** Character Classes
+
+   A character class is a character, or group of characters, that you want to match.
+   Complicated and broader character class begin with a percent sign (*%*).
+   A character class by itself is a pattern that matches one character of that class.
+   The simplest character class is a single character, such as A or 9.
+   This represents that exact character.
+
+   A period (*.*) represents any possible character.
+
+   %a represents all letters.
+   %d matchers all digits.
+   %g matches all printable characters except for spaces.
+   %l matches all lowercase letters, while %u matches all uppercase letters.
+   %w matches all alphanumeric characters
+   %c matches all control characters
+   %p matches all punctuation
+   %s matches all space characters
+   %x matches all hexadecimal digits
+
+
+** Building Classes
+
+   Patterns let you define custom sets.
+   Custom sets are surrounded with square brackets([])
+
+   EX. Match all alphanumeric characters, plus the at sign and the underscore.
+   [%w@_]
+
+   Create a set that excludes items by putting a caret (*^*) at the front of the list.
+   If I really want to match everything except the letter Q, I could create a set like this [^q]
+
+
+** Magic Characters
+
+   Lua uses certain characters internally for the pattern definitions.
+   To literally match a magic character, escape it with a percent sign.
+   The character class %^ represent a caret, and the custom set [%[%]] represents either square bracket.
+   Match a percent sign with %%.
+   Lua consider the characters ^ $ () % . [] * + - ? *magic*.
+
+** Wildcards and Pattern Items
+
+   Pattern items are a group of character classes, probably combined with wildcards.
+   The simplest pattern item is a single character class by itself, without a wildcard.
+   The letter X matches the character X.
+   %d matches a single digit.
+   %w matches a single alphanumeric character.
+
+   An asterisk(***) means that you'll match zero or more of the previous character.
+   The pattern w* matches zero or more lower-case Ws.
+
+   A plus sing (*+*) matches one or more of the previous characters.
+   w+ match w or wwwwwww.
+
+   Wildcard ? matches wither zero or one appearance of the character class.
+
+   *DON'T CONFUSE PATTERN WILDCARDS WITH GLOB WILDCARDS*
+
+
+** Patterns and Anchors
+
+   EX. You want to match a string of numbers followed by a string of letters.
+   A pattern like %d+%a+ matches strings as diverse as "1A" and "897123htnsoeu".
+
+   To match a string of a more specific length, the pattern must repeat the character class that many times.
+   The pattern %d%d%d%d matches 4 digits in a row, where %d%d matches 2.
+
+   For web sites that file articles by year, month and day, that's enough to identify parts of the web site containing dated articles.
+
+   #+begin_src conf
+     location "/%d%d%d%d/%d%d/%d/" {
+       directory no auto index
+     }
+   #+end_src
+
+   If you had to set up a separate configuration for each year, you wouldn't bother.
+   When used at the front of a pattern, a caret (*^*) anchors the pattern to the beginning of the string. A dollar sign (*$*) used at the end anchors the pattern tot the end of the string.
+
+   Suppose you want to match a location that starts with a year, month and day, but you don't care about what's after that.
+
+   #+begin_src conf
+     location "^ /%d%d%d%d/%d%d/%d/" {
+       directory no auto index
+     }
+   #+end_src
+
+* Pattern Substrings
+
+   Patterns have a memory.
+   You can use them to build redirects out of parts of a string.
+
+   Tell a pattern to remember a series of patterns items by enclosing the items in parenthesis.
+
+   ^/(%d%d%d%d)/(%d%d)/([^/]+)$
+
+   This pattern is anchored to the beginning of the requested document - that is, *$DOCUMENT_URI* variable.
+
+   You can refer back to these items by using a percent sign and the number.
+   Want to recall the first chunk? Use %1.
