@@ -8,3 +8,4 @@ Useful Links for the site navigation
 * [[file:httpd_essentials.html][Httpd Essentials]]
 * [[file:blocks_redirects.html][Httpd Blocks and Redirects]]
 * [[file:globs_patterns.html][Globs and Patterns]]
+* [[file:httpd_logging_debugging.html][Httpd Debugging and Logging]]

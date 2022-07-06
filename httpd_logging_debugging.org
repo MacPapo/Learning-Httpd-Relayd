@@ -1,0 +1,147 @@
+#+title: Httpd Logging and Debugging
+#+author: Jacopo Costantini
+
+* Httpd Logs
+
+  By default, httpd logs everything to 2 files in the /logs/ directory in the /chroot/.
+
+  The /access.log/ file contains activity across all web sites, in the traditional Apache common format
+
+  The /error.log/ file lists both server and site errors, also in the Apache format.
+
+  Httpd also lets you log via *syslogd*.
+  While *syslogd* normally runs over UDP, and is thus prone to losses, OpenBSD's syslogd can both use TCP and encrypt traffic in transit.
+
+
+** Log Customisation
+
+   Each server can generate its own access log and error log.
+   You can set the log location and format on a per-server basis.
+
+   Httpd supports the 2 traditional web server log formats:
+   - *COMMON*: the older format
+   - *COMBINED*: the newer format, with more data.
+
+   Httpd uses the *common* format by default.
+
+   Use the /log style/ option to change that.
+
+   #+begin_src conf
+     server macpapo.dev {
+        log style combined
+        ...
+   #+end_src
+
+   Httpd also supports the /connection/ log style, based on the log format used by /relayd/.
+
+   You can give each server its own log file, set the access log location with the /log access/ and the error log with /log error/.
+
+   #+begin_src conf
+     log access macpapo_access
+     log error macpapo_error
+   #+end_src
+
+   You can store these logs in a subdirectory, but you must enclose the location in quotes.
+
+   #+begin_src conf
+     log access "mp/macpapo_access"
+     log error "mp/macpapo_error"
+   #+end_src
+
+   Rotate httpd logs with newsyslog.
+   OpenBSD's //etc/newsyslog.conf/ rotates the default access log every Sunday at midnight, and newsyslog keeps 4 logs. The error log rotates every time it grows to 250 kilobytes, and newsyslog keeps 7 logs.
+   After rotating log, newsyslog sends the SR1 signal to httpd to tell it to start a new file
+
+   If you create your own files, add entries for those logs to /newsyslog.conf/, modelled after the existing entries.
+
+
+** Excluding Items From Logs
+
+   Use location statement and /no log/ to not send certain requests to the access log.
+
+   #+begin_src conf
+     loactino "/amongus.html" {
+          no log
+      }
+   #+end_src
+
+   A no log statement only blocks items from the /access log/.
+   Attempted but failed access still show up in the error log.
+
+
+** Log Directory
+
+   You might find that you need to move the logs away from //var/www/logs/.
+   The /logdir/ global option lets you change the log directory.
+   You must specify the full path to the new log directory.
+
+   #+begin_src conf
+     logdir "/var/www/log2"
+   #+end_src
+
+   This is a global option, so it affects all servers.
+
+   Web server logs can get very large very quickly, so I recommend putting them on a different partition than the main system logs.
+
+   To move the logs entirely off of the host, use /syslog/.
+
+
+** Sending Logs Via Syslog
+
+   Httpd can send access and error logs via the syslog interface.
+   This allows you to store logs outside the chroot, or even forward them to another machine.
+   It's a one-line configuration change.
+
+   #+begin_src conf
+     server macpapo.dev {
+        log syslog
+        ...
+   #+end_src
+
+   OpenBSD's syslog daemon supports sending log message to other hosts over TCP, with TLS for encryption.
+   The combination makes remote logging more reliable and more private than traditional remote logging.
+
+   If the logs of a busy server are important, log to the local machine.
+
+   *LOGS ARE VITAL WHEN SOMETHING GOES WRONG*
+
+
+* Testing and Debugging Httpd
+
+  Httpd will not restart with an invalid configuration.
+  Test you httpd setup with /-n/
+
+  #+begin_src shell
+    # httpd -n
+    configuration OK
+  #+end_src
+
+  A valid configuration file doesn't mean that httpd will start; it only means that httpd can parse the configuration.
+
+  Specify an alternate configuration file with -f. You can combine this with /-n/ flag, to test a configuration before copying it to its proper location.
+
+  #+begin_src shell
+    # httpd -nf httpd.conf-test
+    configuration OK
+#+end_src
+
+  To test a configuration with only minor changes, you can change macro values on the command line.
+
+  #+begin_src shell
+    # httpd -Dpublic_ip+"192.1.2.222"
+  #+end_src
+
+  Changing macro values is most useful when trying to debug httpd.
+  While the error log will point out the most obvious problems, you have 2 additional debugging tools:
+
+  - *Verbose mode* -> /-v/
+  - *Foreground mode*
+    The /-d/ flag tell httpd to not detach from the terminal, but rather print all its logs to the terminal.
+
+    Running in /debug-mode/ disables syslog logging.
+
+    #+begin_src shell
+      # httpd -dvv
+    #+end_src
+
+    Foreground mode tells you what httpd is actually doing, as opposed to what you though you configured it to do.
