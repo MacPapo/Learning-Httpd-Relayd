@@ -1,0 +1,235 @@
+#+title: Dynamic Content and Chroots
+#+author: Jacopo Costantini
+
+* Common Gateway Interface
+
+One of the earliest ways to generate dynamic content was to /Common Gataway Interface/, or *CGI*.
+A web site could collect user input, feed that to a program, and feed the program results back to the user.
+
+OpenBSD includes a sample *CGI* program, the *BGP looking glass*, /bgplg/.
+It's a binary executable, requiring little environment support beyond itself and a couple programs.
+It provides web-based ping and tracerout functions as well as BGP features.
+
+* FastCGI with SlowCGI
+
+OpenBSD includes a FastCGI server, called /slowcgi/.
+SlowCGI is not the most feature-filled FastCGI implementation, but the missinig features aren't needed for generating web pages.
+
+Enable SlowCGI
+#+begin_src shell
+  rcctl enable slowcgi
+#+end_src
+
+Do this in an environment where you can control access to web site, however-/not/ in production.
+
+SlowCGI opens a socket in //var/www/run/slowcgi.sock/.
+You can set a different socket with the /-s/ flag, but any one slowcgi process can listen to only *one socket at a time*.
+If you run httpd with a chroot directory other than //var/www/, use slowcgi's /-p/ argument to set a different chroot directory.
+
+If slowcgi is not running, all CGI requests give "*500 Internal Server Error.*"
+
+* httpd.conf for bgplg
+
+Running the BGP looking glass requires telling httpd which requests is should hand off to FastCGI server.
+For bgplg in particular, you also must attach the //var/www/cgi-bin/ directory to the server, like so.
+
+#+begin_src conf
+      server  "befault" {
+           listen on * port 80
+           location "/cgi-bin/*" {
+               root "/"
+               fastcgi
+           }
+        }
+#+end_src
+
+The bgplg application is present the default document directory, //var/www/htdocs/, so I don't need to specify a new document directory in this configuration.
+
+* Environments and CGIs
+
+The point of a chroot is that programs cannot access files outside the chroot.
+Any files your CGI needs must be included in the chroot.
+
+Httpd ships with all the programs bgplg needs in //var/www/bin/.
+The permissions are blank by default, however, as part of OpenBSD's secure-by-default configuration.
+Nobody may read, write, or execute these files.
+
+The main program used for BGP lookups is bgplg. You must assign read and execute permission to //var/www/cgi-bin/bgplg/ for the web server to run it.
+#+begin_src shell
+  chmod 555 /var/www/cgi-bin/bgplg
+#+end_src
+
+The BGP looking glass can call few other programs, such as ping, traceroute, and bgpctl. If you're using those functions, make those programs readable and executable as well.
+Ping and traceroute run /setuid/, so they need that permission as well.
+#+begin_src shell
+  chmod 4555 /var/www/bin/ping*
+  chmod 4555 /var/www/bin/traceroute*
+#+end_src
+
+The //var/ partition is mounted nosuid by default. You must turn htat off in //etc/fstab/ if you want these programs to work.
+
+The web server user (normally *www*) should not own any CGI scripts or executables, Don't give *www* permissions to write to files in the chroot,
+unless an application specifically requires that.
+
+Finally, if you're running bgpd and want to use the /bgplg/ CGI to view host's BGP table, add an extra control socket in //etc/bgpd.conf/.
+#+begin_src conf
+      socket "/var/www/run/bgpd.rsock" restricted
+#+end_src
+
+You should now be able to open //bgplg/ on your server and see a friendly GUI for performing BGP lookups, tracerouts, and pings.
+
+* Living in a Chroot
+
+A chroot contains only the software needed to perform its task.
+The constrained environment of a chroot is a reliable security tool.
+
+Realistically, intruders don't usually break into web servers. They break into insicure applications.
+It doesn't matter how tightly you secure the web server if you use it to host a terribly insicure application.
+By running the site in a chroot, though, you can make a compromised site worthless to the intruder.
+
+Many web applications want *DNS resolution* and the local time.
+If your app is one of those, create //var/www/etc/. Copy //etc/hosts/, //etc/resolv.conf/ and //etc/localtime/ to that directory.
+
+* Updating Your Chroot
+
+System updates change the binaries and shared libraries on your system. How do you manage the chroot with those changes??
+I strongly encourage you to recreate the //var/www/usr/ directory tree after every upgrade.
+The easier you can make chroot maintenance, the more likely you are to perform chroot maintenance.
+
+* Troubleshooting
+
+If you have a complicated chroot, eventually you'll hit a situation where nothing works and you don't know why.
+Thoubleshooting a chroot from the outside can be annoying and difficult.
+Sometimes it's far easier to lock yourself into the chroot and look around.
+It's a last-ditch troubleshooting method, but when you're standing in the last ditch you use the tools you have.
+
+The main problem with going into a chroot is that it doesn't have a shell.
+You can copy any statically linked shell, such as //bin/sh/, into a chroot. Upon finishing debugging, you really need to remove it immediately.
+I find it safer to run the copy, the chroot, and the removal all in one command.
+#+begin_src shell
+  cp /bin/sh /var/www/tmp && chroot /var/www /temp/sh \
+                                    && rm /var/www/temp/sh
+#+end_src
+
+This command automatically removes the shell from the chroot when I exit the shell.
+Working inside a chrooted shell can fell very clumsy.
+Basic programs like ls are missing, but /echo */ works.
+
+* Wordpress
+
+Wordpress uses PHP to generate the front-end content, backed by MySQL-compatible databas.
+OpenBSD provides MySQL services with MariaDB, a MySQL fork.
+
+** Package Software Installation
+
+Start by installing the needed OpenBSD packages.
+#+begin_src shell
+  pkg_add mariadb-server php-curl php-mysqli
+#+end_src
+
+Then enable these services.
+#+begin_src shell
+  rcctl enable mysqld
+  rcctl enable php81_fpm
+#+end_src
+
+** MariaDB Setup
+
+Before you create your first database entry, configure MariaDB to work with httpd.
+
+MariaDB (and MySQL) servers normally communicate with clients through a Unix socket in //var/run/mysql/mysql.sock/.
+Httpd can only access files in //var/www/, however.
+This blocks PHP programs on the site from talking to your database. The easiest way around this is to move the MariaDB socket into the chroot.
+
+#+begin_src shell
+  mkdir -p /var/www/var/run/mysql
+  cp /var/run/mysql/mysql.sock /var/www/var/run/mysql/
+  chown _mysql:_mysql /var/www/var/run/mysql
+#+end_src
+
+Tell the server and the client about it by editing //etc/my.cnf/. You must make matching entries under both /[client]/ and /[mysqld]/.
+#+begin_src conf
+  [client]
+      socket = /var/www/var/run/mysql/mysql.sock
+  [mysqld]
+      socket = /var/www/var/run/mysql/mysql.sock
+#+end_src
+
+Before you can create your Wordpress database, you need a basic MySQL database with tables to record users, the existance of databases, and so on.
+Run mysql_install_db to perform basic setup, then fire up the database.
+
+#+begin_src shell
+  mysql_install_db
+  rcctl start mysqld
+#+end_src
+
+A default MySQL database requires no authentication and includes a variety of well-known test data.
+Assign a root access password and toss out the cruft by running *mysql_secure_installation*.
+
+Each Wordpress installation needs a database user and its own private database.
+#+begin_src shell
+  mysql -u root -p
+#+end_src
+
+Your Wordpress database needs a username, a password, and a database.
+I'm using *wpuser, wppwd*, and *wpdb*.
+
+#+begin_src sql
+  create database wpdb;
+  grant all privilegs on wpdb.* to \
+        "wpuser"@"localhost" identified by "wppwd";
+  flush privileges;
+  quit
+#+end_src
+
+** Configure PHP
+
+The configuration directory for PHP 8.1 is //etc/php-8.1/, and the examples appear in //etc/php-8.1.sample/. I installed the modules needed by Wordpress.
+#+begin_src shell
+  cd /etc/hph-8.1
+  cp ../php-8.1.sample/* .
+#+end_src
+
+That should take care of PHP itself. But we also need the PHP-FPM engine.
+We enabled it in //etc/rc.conf.local/, but you still need to start it
+#+begin_src shell
+  rcctl start php81_fpm
+#+end_src
+
+While PHP-FPM should run fine as is, if you find you need special configuration you can adjust //etc/php-fpm.conf/.
+
+** Alternate FastCGI Sockets
+
+PHP needs to run through PHP-FPM, not via slowcgi.
+You need to tell httpd to use a different FastCGI socket for files ending in /.php/.
+
+#+begin_src conf
+  server "default" {
+         listen on * port 80
+         directory index index.php
+         location "*.php" {
+           fastcgi socket "/run/php-fpm.sock"
+         }
+  }
+#+end_src
+
+We again assume that you're making //var/www/htdocs/ the server's root directory.
+
+** Installing Wordpress
+
+Once the operating system and supporting applications are configured, take a run at Wordpress and the chroot.
+
+Wordpress must be able to resolve hostnames, and it needs access to the local time. 
+Create //var/www/etc and copy //etc/hosts/, //etc/resolv.conf/ and //etc/localtime/ to that directory.
+Move the default //var//www/htdocs/ out of the way.
+
+Grab the latest Wordpress tarball, extract it, and rename the new /wordpress/ directory to /htdocs/.
+Make this directory and everything in it owned by the httpd user, *www*.
+
+#+begin_src shell
+  ftp https://wordpress.org/latest.tar.gz
+  tar -xzf latest.tar.gz
+  mv wordpress htdocs
+  chown -R www:www htdocs
+#+end_src
+
